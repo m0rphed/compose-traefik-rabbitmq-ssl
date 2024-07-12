@@ -60,5 +60,5 @@ services:
     volumes:
       - "./rabbitmq-data:/var/lib/rabbitmq"     # Host path to RabbitMQ data directory
       - "./letsencrypt/live/${APP_DOMAIN_URL}:/etc/rabbitmq/ssl:ro"    # Use the same LetsEncrypt certificates
-      - "./rabbitmq-config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf"
+      - "./rabbitmq-conf/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf"
     restart: unless-stopped
