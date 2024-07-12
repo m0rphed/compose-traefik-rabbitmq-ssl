@@ -1,0 +1,64 @@
+version: "3.3"
+
+services:
+  traefik:
+    image: "traefik:v2.10"
+    container_name: "traefik"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    restart: unless-stopped
+
+  cert-extractor:
+    image: python:3.8-slim
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "./scripts:/app"
+    command: python /app/extract_certs.py
+    environment:
+      - DOMAIN=${APP_DOMAIN_URL}
+      - RESOLVER_NAME=myresolver
+      - ACME_JSON_PATH=/letsencrypt/acme.json
+      - OUT_DIR=/letsencrypt/live/
+    restart: on-failure
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3.13-management
+    depends_on:
+      - cert-extractor
+    ports:
+      - "5671:5671"   # AMQP over SSL
+      - "15672:15672" # TCP management port
+      - "15671:15671" # TLS management port
+      # (uncomment if needed) empd - used for peer discovery service
+      # - "4369:4369"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rabbitmq.rule=Host(`${APP_DOMAIN_URL}`)"
+      - "traefik.http.routers.rabbitmq.entrypoints=websecure"
+      - "traefik.http.routers.rabbitmq.tls.certresolver=myresolver"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15671"
+    environment:
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+    volumes:
+      - "./rabbitmq-data:/var/lib/rabbitmq"     # Host path to RabbitMQ data directory
+      - "./letsencrypt/live/${APP_DOMAIN_URL}:/etc/rabbitmq/ssl:ro"    # Use the same LetsEncrypt certificates
+      - "./rabbitmq-config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf"
+    restart: unless-stopped
