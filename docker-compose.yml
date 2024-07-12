@@ -43,8 +43,8 @@ services:
     depends_on:
       - cert-extractor
     ports:
-      - "5671:5671"   # AMQP over SSL
-      - "15672:15672" # management TCP port that would be routed to Traefik 
+      - "5671:5671"   # AMQP with SSL
+      - "15671:15671" # RabbitMQ Management web interface TCP port (Traefik) 
       # (uncomment if needed) empd - used for peer discovery service
       # - "4369:4369"
     labels:
@@ -52,7 +52,7 @@ services:
       - "traefik.http.routers.rabbitmq.rule=Host(`${APP_DOMAIN_URL}`)"
       - "traefik.http.routers.rabbitmq.entrypoints=websecure"
       - "traefik.http.routers.rabbitmq.tls.certresolver=myresolver"
-      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
+      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15671"
     environment:
       - RABBITMQ_USER=${RABBITMQ_USER}
       - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
